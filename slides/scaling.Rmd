@@ -1,0 +1,307 @@
+---
+title: "スケーリング処理"
+subtitle: "Part of `r emo::ji('book')`Data Preprocessing Cookbook `r emo::ji('cook')`"
+author: "Uryu Shinya"
+institute: "<span style = 'font-size: 70%;'>`r icon::fa('github')` uribo `r icon::fa('twitter')` u_ribo</span>"
+date: "2019/06/29 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts, ja-JP.css]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+---
+
+```{r setup, include=FALSE}
+source(here::here("R/setup.R"))
+options(htmltools.dir.version = FALSE)
+```
+
+# 概要
+
+- データが取り得る値の規模 (scale)をデータ間で揃える処理
+    - 分布には影響しない
+- 異なる単位をもつデータを扱う場合に役立つ --> 連続変数からなる多くのデータに該当する
+    - 体重 (kg)と身長 (cm)... 同じ値120であってもそれぞれ意味合いが異なるため比較できない
+- 多くのモデルではスケーリングが行われていることが前提となる
+    - リッジ回帰、主成分分析では特に注意
+    - 木ベースのモデルではスケーリングを気にしない
+
+```{r, include=FALSE}
+df_lp_kanto_piv <- 
+  df_lp_kanto %>% 
+  select(posted_land_price, distance_from_station, acreage, night_population) %>% 
+  summarise_all(list(mean = mean, min = min, max = max, sd = sd)) %>% 
+  pivot_longer(everything(), 
+               names_to = c("variable", "stats"), 
+               names_pattern = "(.*)_(.*)") %>% 
+  pivot_wider(id_cols = variable, 
+              names_from = stats) %>% 
+  mutate(unit = c("円/m2", "m", "m2", "人"))
+```
+
+```{r lp_kanto_piv, echo=FALSE, eval=TRUE}
+df_lp_kanto_piv %>% 
+  knitr::kable(format = "html", 
+               caption = "地価データにおける「地価」、「最寄駅からの距離」「地籍」「該当する市町村の夜間人口」の要約統計量")
+```
+
+比較対象の変数間で平均と分散が異なることに起因する問題
+
+```{r}
+x <- df_lp_kanto$distance_from_station
+```
+
+---
+# 中心化 (centering)
+
+- 平均を0にする
+- データの値を定数（平均値が利用されることが多い）によって引く
+
+$$\tilde{x} = x - mean(x)$$
+
+.pull-left[
+```{r}
+x_center <- x - mean(x)
+mean(x_center)
+```
+]
+
+.pull-right[
+```{r step_center, warning = FALSE}
+df_lp_kanto %>% 
+  recipe(~ distance_from_station) %>% 
+  step_center(all_predictors()) %>% #<<
+  prep(training = df_lp_kanto) %>% 
+  bake(new_data = df_lp_kanto) %>% 
+  summarise(mean = mean(distance_from_station),
+            sd = sd(distance_from_station)) %>% 
+  knitr::kable(format = "html")
+```
+]
+
+---
+# スケーリング (scaling)
+
+- 特徴量を分散で割ることにより、分散1を得る
+
+
+$$s^2 = \frac{x}{var(x)}$$
+
+.pull-left[
+```{r}
+sd(x / sd(x))
+```
+]
+
+.pull-right[
+```{r step_scale, warning = FALSE}
+df_lp_kanto %>% 
+  recipe(~ distance_from_station) %>% 
+  step_scale(all_predictors()) %>% #<<
+  prep(training = df_lp_kanto) %>% 
+  bake(new_data = df_lp_kanto) %>% 
+  summarise(mean = mean(distance_from_station),
+            sd = sd(distance_from_station)) %>% 
+  knitr::kable(format = "html")
+```
+]
+
+---
+# 標準化 (standardization)
+
+- 中心化 + スケーリング。オートスケーリングとも呼ばれる
+- データの分布が正規分布に従うことを仮定する
+- 特徴量の値を**平均0、分散1**に変換
+- 元のデータが正規分布に従う場合は、標準化された値も正規分布に従う
+
+$$\tilde{x} = \frac{x- mean(x)}{sqrt(var(x))}$$
+.pull-left[
+```{r,eval = FALSE, echo=FALSE}
+mean(x_center / sqrt(var(x)))
+sd(x_center / sqrt(var(x)))
+```
+
+```{r}
+# scale()が用意されている
+lp_dist_scaled <- 
+  scale(x, center = TRUE, scale = TRUE)
+mean(lp_dist_scaled) # 限りなく0に近くなる
+sd(lp_dist_scaled) # 分散は1
+```
+]
+
+.pull-right[
+```{r step_scale2, warning=FALSE}
+df_lp_kanto %>% 
+  recipe(~ distance_from_station) %>% 
+  step_center(all_predictors()) %>% #<<
+  step_scale(all_predictors()) %>% #<<
+  prep(training = df_lp_kanto) %>% 
+  bake(new_data = df_lp_kanto) %>% 
+  summarise(mean = mean(distance_from_station),
+            sd = sd(distance_from_station)) %>% 
+  knitr::kable(format = "html")
+```
+]
+
+---
+# Min-Maxスケーリング
+
+- 値の範囲を0から1に収まるように調整する
+- 対象の変数の最小値、最大値を利用する
+- 外れ値の影響を受けやすい
+- 最小値、最大値があらかじめ決まっている場合に有効
+    - e.g. 画像処理におけるRGBの強さ(0~255)
+
+$$\tilde{x} = \frac{x - min(x)}{max(x) - min(x)}$$
+```{r}
+lp_dist_minmax <- 
+  scale(x, center = min(x), scale = (max(x) - min(x))) #<<
+range(lp_dist_minmax)
+```
+
+---
+# スケーリングは分布には影響しない
+
+```{r plot_scaling, eval = TRUE, echo = FALSE, fig.width = 3, fig.height = 1.6, warning = FALSE, fig.align = 'center', dpi = 320}
+p1 <- 
+  ggplot(df_lp_kanto, aes(distance_from_station)) +
+  geom_density(color = ds_col(1))
+
+p2 <- 
+  ggplot(df_lp_kanto, aes(scale(distance_from_station))) +
+  geom_density(color = ds_col(5)) +
+  ylab("lp_dist standardization")
+
+cowplot::plot_grid(p1, p2)
+```
+
+---
+# スケーリング処理を行わない場合の問題
+
+- 重回帰モデル、主成分分析の例を紹介
+- 単位の異なる4つの変数
+
+```{r, ref.label="lp_kanto_piv", echo = FALSE}
+```
+
+
+---
+# スケーリング処理を行わない場合の問題1: 重回帰モデル
+
+- 変数間の係数の直接的な比較が困難
+- 標準化回帰係数を利用する方法もある
+
+```{r}
+mod_formula <- formula(posted_land_price ~ distance_from_station + acreage + night_population)
+
+lm(mod_formula, data = df_lp_kanto) %>% 
+  tidy() %>% 
+  knitr::kable(format = "html")
+```
+
+---
+# スケーリング処理を行わない場合の問題1: 重回帰モデル
+
+```{r, warning = FALSE}
+df_lp_kanto %>% 
+  recipe(mod_formula) %>% 
+  step_center(all_predictors()) %>% 
+  step_scale(all_predictors()) %>% 
+  prep() %>% 
+  juice() %>% 
+  lm(mod_formula, data = .) %>% 
+  tidy() %>% 
+  knitr::kable(format = "html")
+```
+
+
+---
+# スケーリング処理を行わない場合の問題2: 主成分分析
+
+- 主成分分析はスケール不変性を持たない
+    - 異なる単位の変数を入力に与えると大きな値の入った変数の影響が強くなる
+- `r emo::ji("owl")` `prcomp()` では標準化するためのオプションが用意されているが、歴史的な経緯により引数`scale.`が規定値では`FALSE`なのに注意 `r emo::ji("warning")`
+
+.pull-left[
+```{r}
+# デフォルトの挙動
+pca_res <- 
+  prcomp(~ distance_from_station + acreage + night_population, 
+       data = df_lp_kanto,
+       center = TRUE, #<<
+       scale. = FALSE) #<<
+# 主成分軸上のSDが大きく異なっていることに注意（単位の影響を強く受けている）
+pca_res
+```
+]
+
+.pull-right[
+```{r}
+# 第1主成分のみで累積寄与率が99%を超える
+summary(pca_res)
+```
+]
+
+---
+# スケーリング処理を行わない場合の問題2: 主成分分析
+
+.pull-left[
+```{r}
+pca_res_scaled <- 
+  prcomp(~ distance_from_station + acreage + night_population, 
+       data = df_lp_kanto,
+       scale. = TRUE) #<<
+# SDの値が変更
+pca_res_scaled
+```
+]
+
+.pull-right[
+```{r}
+# 第2主成分を含めた状態で累積寄与率72%
+summary(pca_res_scaled)
+```
+
+]
+
+---
+# スケーリング処理を行わない場合の問題2: 主成分分析
+
+- 主成分得点もスケーリング処理の有無により異なる
+
+.pull-left[
+```{r}
+head(pca_res$x) %>% 
+  knitr::kable(format = "html")
+```
+
+]
+
+.pull-right[
+```{r, warning=FALSE}
+df_lp_kanto %>% 
+  recipe(~ distance_from_station + acreage + night_population) %>% 
+  step_center(all_predictors()) %>% 
+  step_scale(all_predictors()) %>% 
+  step_pca(all_predictors()) %>% 
+  prep() %>% 
+  juice() %>% 
+  head() %>% 
+  knitr::kable(format = "html")
+```
+]
+
+
+---
+# Session info
+
+.scroll-output[
+```{r session, eval = TRUE, echo = FALSE}
+sessioninfo::session_info()
+```
+]

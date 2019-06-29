@@ -1,0 +1,195 @@
+---
+title: "不均衡データに対する調整"
+subtitle: "Part of `r emo::ji('book')`Data Preprocessing Cookbook `r emo::ji('cook')`"
+author: "Uryu Shinya"
+institute: "<span style = 'font-size: 70%;'>`r icon::fa('github')` uribo `r icon::fa('twitter')` u_ribo</span>"
+date: "2019/06/29 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts, ja-JP.css]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+---
+
+```{r setup, include = FALSE}
+source(here::here("R/setup.R"))
+options(htmltools.dir.version = FALSE)
+```
+
+# 概要
+
+- クラスに偏りのある不均衡データを直接利用すると予測結果も偏りの影響を受ける
+    - 適切な評価指標の利用が必要
+- クラス不均衡への対応には大きく分けて2通りの方法がある
+    - コスト考慮型学習 (ここでは解説しない)
+    - **リサンプリング**... 正例と負例のサンプル数を調整する
+- クラス間での偏りを考慮したリサンプリングとして
+    - ダウンサンプリング (down-sampling)、アンダーサンプリング
+    - アップサンプリング (up-sampling)、オーバーサンプリング
+    - ハイブリッド法
+
+---
+# 不均衡データ
+
+- クラスに属する件数に偏りがあるデータを不均衡データ (imbalanced data) と呼ぶ
+    - e.g. 迷惑メールを区別するための「負例 (迷惑メール)」と「正例 (正常なメール)」
+    - 多クラス分類においては、あるクラスに集中したり、人気のないクラスが発生することもある
+    - 異常検知の分野では特に顕著
+- 不均衡のある状態でクラス分類を行うと多数派に偏った識別が行われてしまう
+
+.pull-left[
+```{r}
+df_imbl <- tibble(class = c(rep(TRUE, 1000),
+                            rep(FALSE, 9000)) %>% 
+    as.numeric() %>% 
+    as.factor(),
+  value = rnorm(10000))
+
+imbl_split <- initial_split(df_imbl)
+df_train <- training(imbl_split)
+df_test <- testing(imbl_split)
+```
+]
+
+.pull-right[
+```{r plot_class_imbalance, echo=FALSE, fig.width = 1.6, fig.height = 1.1, warning = FALSE, fig.align = 'center', dpi = 320}
+p_impb <- 
+  df_train %>% 
+  count(class) %>% 
+  ggplot(aes(class, n, fill = class)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_fill_ds()
+
+p_impb
+```
+]
+
+---
+# 不均衡データの問題
+
+- 正例データに対する識別を目的に分類を行う
+- accuracy 90%を達成するが「すべてのデータが負例である」と予測された精度
+    - recall 100%... 正例データの検出はできていない
+
+```{r}
+mod_eng_glm <- logistic_reg(mode = "classification") %>%
+  set_engine(engine = "glm",
+             family = "binomial")
+classification_metric <- metric_set(precision, accuracy, recall)
+
+fit(
+  mod_eng_glm,
+  class ~ value,
+  data = df_train) %>% 
+  predict(new_data = df_train) %>%
+  bind_cols(df_train) %>% 
+  classification_metric(truth = class, estimate = .pred_class) %>% 
+  knitr::kable(format = "html")
+```
+
+
+
+---
+# ダウンサンプリング
+
+- クラスの頻度が最も少ないクラスと一致するよう、少数クラス以外のクラスをランダムに除外
+    - ランダムサンプリングによる偏りが発生するのでクラスタ分析と組み合わせて利用することがある
+- データ件数は減少する
+
+```{r, warning=FALSE}
+df_down_train <- df_train %>% 
+  recipe(~ .) %>% 
+  step_downsample(class) %>% #<<
+  prep() %>% 
+  juice()
+```
+
+```{r plot_class_imbalance_downsample, echo = FALSE, warning=FALSE, fig.width = 2.6, fig.height = 1.2, warning = FALSE, fig.align = 'center', dpi = 320}
+df_train %>% 
+  mutate(type = "original") %>% 
+  bind_rows(df_down_train %>% 
+              mutate(type = "down_sample")) %>% 
+  mutate(type = forcats::fct_inorder(type)) %>% 
+  count(type, class) %>% 
+  ggplot(aes(class, n, fill = class)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_fill_ds() +
+    facet_wrap(~ type)
+```
+
+
+---
+# アップサンプリング
+
+- 少数のクラスを多数派のクラス件数と同じになるよう、ランダムに複製を行う
+    - 過学習を引き起こしやすい
+        - 既存データの複製ではなく、ノイズを加えたデータを増やす事で解決
+
+```{r, warning=FALSE}
+df_up_train <- df_train %>% 
+  recipe(~ .) %>% 
+  step_upsample(class) %>% #<<
+  prep() %>% 
+  juice()
+```
+
+```{r plot_class_imbalance_upsample, echo = FALSE, warning=FALSE, fig.width = 2.6, fig.height = 1.2, warning = FALSE, fig.align = 'center', dpi = 320}
+df_train %>% 
+  mutate(type = "original") %>% 
+  bind_rows(df_up_train %>% 
+              mutate(type = "up_sample")) %>% 
+  mutate(type = forcats::fct_inorder(type)) %>% 
+  count(type, class) %>% 
+  ggplot(aes(class, n, fill = class)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_fill_ds() +
+    facet_wrap(~ type)
+```
+
+---
+# SMOTE (synthetic minority over-sampling technique)
+
+- アップサンプリングの拡張 (ハイブリッド法)
+    - 既存データの複製ではなく、人工的に生成されたデータを利用する
+         - k最近傍点までの点をランダムに生成
+    - 多数派に対してはダウンサンプリング
+- `r emo::ji("owl")` DMwR::SMOTE()
+- さらなる拡張として `ROSE` (`r emo::ji("owl")` ROSEパッケージ) など
+
+```{r, results="hide"}
+library(DMwR)
+df_smote <- 
+  SMOTE(class ~ ., 
+        data = as.data.frame(df_train),
+        # 少数派データとして追加される人口データの最近傍の数を与える #<<
+        k = 5) #<<
+```
+
+---
+# SMOTE (synthetic minority over-sampling technique)
+
+```{r plot_class_imbalance_smote, echo = FALSE, warning=FALSE, fig.width = 2.6, fig.height = 1.2, warning = FALSE, fig.align = 'center', dpi = 320}
+df_train %>% 
+  mutate(type = "original") %>% 
+  bind_rows(df_smote %>% 
+              mutate(type = "SMOTE")) %>% 
+  mutate(type = forcats::fct_inorder(type)) %>% 
+  count(type, class) %>% 
+  ggplot(aes(class, n, fill = class)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_fill_ds() +
+    facet_wrap(~ type)
+```
+
+---
+# Session info
+
+.scroll-output[
+```{r session, eval = TRUE, echo = FALSE}
+sessioninfo::session_info()
+```
+]
