@@ -165,7 +165,7 @@ library(DMwR)
 df_smote <- 
   SMOTE(class ~ ., 
         data = as.data.frame(df_train),
-        # 少数派データとして追加される人口データの最近傍の数を与える #<<
+        # 少数派データとして追加される人工データの最近傍の数を与える #<<
         k = 5) #<<
 ```
 
