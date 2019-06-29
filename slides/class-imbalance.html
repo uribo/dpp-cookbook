@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>不均衡データに対する調整</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Uryu Shinya" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis-fonts.css" rel="stylesheet" />
+    <link href="libs/font-awesome/css/fontawesome-all.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="ja-JP.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# 不均衡データに対する調整
+## Part of 📖Data Preprocessing Cookbook 👩‍🍳
+### Uryu Shinya
+### <span style="font-size: 70%;"><i class="fab  fa-github "></i> uribo <i class="fab  fa-twitter "></i> u_ribo</span>
+### 2019/06/29 (updated: 2019-06-29)
+
+---
+
+
+
+
+# 概要
+
+- クラスに偏りのある不均衡データを直接利用すると予測結果も偏りの影響を受ける
+    - 適切な評価指標の利用が必要
+- クラス不均衡への対応には大きく分けて2通りの方法がある
+    - コスト考慮型学習 (ここでは解説しない)
+    - **リサンプリング**... 正例と負例のサンプル数を調整する
+- クラス間での偏りを考慮したリサンプリングとして
+    - ダウンサンプリング (down-sampling)、アンダーサンプリング
+    - アップサンプリング (up-sampling)、オーバーサンプリング
+    - ハイブリッド法
+
+---
+# 不均衡データ
+
+- クラスに属する件数に偏りがあるデータを不均衡データ (imbalanced data) と呼ぶ
+    - e.g. 迷惑メールを区別するための「負例 (迷惑メール)」と「正例 (正常なメール)」
+    - 多クラス分類においては、あるクラスに集中したり、人気のないクラスが発生することもある
+    - 異常検知の分野では特に顕著
+- 不均衡のある状態でクラス分類を行うと多数派に偏った識別が行われてしまう
+
+.pull-left[
+
+```r
+df_imbl &lt;- tibble(class = c(rep(TRUE, 1000),
+                            rep(FALSE, 9000)) %&gt;% 
+    as.numeric() %&gt;% 
+    as.factor(),
+  value = rnorm(10000))
+
+imbl_split &lt;- initial_split(df_imbl)
+df_train &lt;- training(imbl_split)
+df_test &lt;- testing(imbl_split)
+```
+]
+
+.pull-right[
+&lt;img src="class-imbalance_files/figure-html/plot_class_imbalance-1.png" style="display: block; margin: auto;" /&gt;
+]
+
+---
+# 不均衡データの問題
+
+- 正例データに対する識別を目的に分類を行う
+- accuracy 90%を達成するが「すべてのデータが負例である」と予測された精度
+    - recall 100%... 正例データの検出はできていない
+
+
+```r
+mod_eng_glm &lt;- logistic_reg(mode = "classification") %&gt;%
+  set_engine(engine = "glm",
+             family = "binomial")
+classification_metric &lt;- metric_set(precision, accuracy, recall)
+
+fit(
+  mod_eng_glm,
+  class ~ value,
+  data = df_train) %&gt;% 
+  predict(new_data = df_train) %&gt;%
+  bind_cols(df_train) %&gt;% 
+  classification_metric(truth = class, estimate = .pred_class) %&gt;% 
+  knitr::kable(format = "html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; .metric &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; .estimator &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; .estimate &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; precision &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; binary &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.8993333 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; accuracy &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; binary &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.8993333 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; recall &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; binary &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.0000000 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+
+---
+# ダウンサンプリング
+
+- クラスの頻度が最も少ないクラスと一致するよう、少数クラス以外のクラスをランダムに除外
+    - ランダムサンプリングによる偏りが発生するのでクラスタ分析と組み合わせて利用することがある
+- データ件数は減少する
+
+
+```r
+df_down_train &lt;- df_train %&gt;% 
+  recipe(~ .) %&gt;% 
+* step_downsample(class) %&gt;%
+  prep() %&gt;% 
+  juice()
+```
+
+&lt;img src="class-imbalance_files/figure-html/plot_class_imbalance_downsample-1.png" style="display: block; margin: auto;" /&gt;
+
+
+---
+# アップサンプリング
+
+- 少数のクラスを多数派のクラス件数と同じになるよう、ランダムに複製を行う
+    - 過学習を引き起こしやすい
+        - 既存データの複製ではなく、ノイズを加えたデータを増やす事で解決
+
+
+```r
+df_up_train &lt;- df_train %&gt;% 
+  recipe(~ .) %&gt;% 
+* step_upsample(class) %&gt;%
+  prep() %&gt;% 
+  juice()
+```
+
+&lt;img src="class-imbalance_files/figure-html/plot_class_imbalance_upsample-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+# SMOTE (synthetic minority over-sampling technique)
+
+- アップサンプリングの拡張 (ハイブリッド法)
+    - 既存データの複製ではなく、人工的に生成されたデータを利用する
+         - k最近傍点までの点をランダムに生成
+    - 多数派に対してはダウンサンプリング
+- 🦉 DMwR::SMOTE()
+- さらなる拡張として `ROSE` (🦉 ROSEパッケージ) など
+
+
+```r
+library(DMwR)
+```
+
+```
+## Loading required package: lattice
+```
+
+```
+## Loading required package: grid
+```
+
+```
+## Registered S3 method overwritten by 'quantmod':
+##   method            from
+##   as.zoo.data.frame zoo
+```
+
+```r
+df_smote &lt;- 
+  SMOTE(class ~ ., 
+        data = as.data.frame(df_train),
+*       # 少数派データとして追加される人口データの最近傍の数を与える
+*       k = 5)
+```
+
+---
+# SMOTE (synthetic minority over-sampling technique)
+
+&lt;img src="class-imbalance_files/figure-html/plot_class_imbalance_smote-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+# Session info
+
+.scroll-output[
+
+```
+## ─ Session info ──────────────────────────────────────────────────────────
+##  setting  value                       
+##  version  R version 3.6.0 (2019-04-26)
+##  os       Debian GNU/Linux 9 (stretch)
+##  system   x86_64, linux-gnu           
+##  ui       X11                         
+##  language (EN)                        
+##  collate  en_US.UTF-8                 
+##  ctype    en_US.UTF-8                 
+##  tz       Etc/UTC                     
+##  date     2019-06-29                  
+## 
+## ─ Packages ──────────────────────────────────────────────────────────────
+##  package       * version     date       lib
+##  abind           1.4-5       2016-07-21 [1]
+##  assertr         2.6         2019-01-22 [1]
+##  assertthat      0.2.1       2019-03-21 [1]
+##  backports       1.1.4       2019-04-10 [1]
+##  base64enc       0.1-3       2015-07-28 [1]
+##  bayesplot       1.7.0       2019-05-23 [1]
+##  bitops          1.0-6       2013-08-17 [1]
+##  boot            1.3-22      2019-04-02 [2]
+##  broom         * 0.5.2       2019-04-07 [1]
+##  callr           3.2.0       2019-03-15 [1]
+##  caTools         1.17.1.2    2019-03-06 [1]
+##  cellranger      1.1.0       2016-07-27 [1]
+##  class           7.3-15      2019-01-01 [2]
+##  cli             1.1.0       2019-03-19 [1]
+##  codetools       0.2-16      2018-12-24 [2]
+##  colorspace      1.4-1       2019-03-18 [1]
+##  colourpicker    1.0         2017-09-27 [1]
+##  conflicted    * 1.0.4       2019-06-21 [1]
+##  crayon          1.3.4       2017-09-16 [1]
+##  crosstalk       1.0.0       2016-12-21 [1]
+##  curl            3.3         2019-01-10 [1]
+##  dials         * 0.0.2       2018-12-09 [1]
+##  digest          0.6.19      2019-05-20 [1]
+##  DMwR          * 0.4.1       2013-08-08 [1]
+##  dplyr         * 0.8.1       2019-05-14 [1]
+##  DT              0.7         2019-06-11 [1]
+##  dygraphs        1.1.1.6     2018-07-11 [1]
+##  emo             0.0.0.9000  2019-06-28 [1]
+##  evaluate        0.14        2019-05-28 [1]
+##  forcats       * 0.4.0       2019-02-17 [1]
+##  gdata           2.18.0      2017-06-06 [1]
+##  generics        0.0.2       2018-11-29 [1]
+##  ggplot2       * 3.2.0       2019-06-16 [1]
+##  ggridges        0.5.1       2018-09-27 [1]
+##  glue            1.3.1.9000  2019-06-28 [1]
+##  gower           0.2.1       2019-05-14 [1]
+##  gplots          3.0.1.1     2019-01-27 [1]
+##  gridExtra       2.3         2017-09-09 [1]
+##  gtable          0.3.0       2019-03-25 [1]
+##  gtools          3.8.1       2018-06-26 [1]
+##  haven           2.1.0       2019-02-19 [1]
+##  here            0.1         2017-05-28 [1]
+##  highr           0.8         2019-03-20 [1]
+##  hms             0.4.2       2018-03-10 [1]
+##  htmltools       0.3.6       2017-04-28 [1]
+##  htmlwidgets     1.3         2018-09-30 [1]
+##  httpuv          1.5.1       2019-04-05 [1]
+##  httr            1.4.0       2018-12-11 [1]
+##  icon            0.1.0       2019-06-28 [1]
+##  igraph          1.2.4.1     2019-04-22 [1]
+##  infer         * 0.4.0.1     2019-04-22 [1]
+##  inline          0.3.15      2018-05-18 [1]
+##  ipred           0.9-9       2019-04-28 [1]
+##  janeaustenr     0.1.5       2017-06-10 [1]
+##  jsonlite        1.6         2018-12-07 [1]
+##  KernSmooth      2.23-15     2015-06-29 [2]
+##  knitr           1.23        2019-05-18 [1]
+##  labeling        0.3         2014-08-23 [1]
+##  later           0.8.0       2019-02-11 [1]
+##  lattice       * 0.20-38     2018-11-04 [2]
+##  lava            1.6.5       2019-02-12 [1]
+##  lazyeval        0.2.2       2019-03-15 [1]
+##  lme4            1.1-21      2019-03-05 [1]
+##  loo             2.1.0       2019-03-13 [1]
+##  lubridate       1.7.4       2018-04-11 [1]
+##  magrittr        1.5         2014-11-22 [1]
+##  markdown        1.0         2019-06-07 [1]
+##  MASS            7.3-51.4    2019-03-31 [2]
+##  Matrix          1.2-17      2019-03-22 [2]
+##  matrixStats     0.54.0      2018-07-23 [1]
+##  memoise         1.1.0       2017-04-21 [1]
+##  mime            0.7         2019-06-11 [1]
+##  miniUI          0.1.1.1     2018-05-18 [1]
+##  minqa           1.2.4       2014-10-09 [1]
+##  modelr          0.1.4       2019-02-18 [1]
+##  munsell         0.5.0       2018-06-12 [1]
+##  nlme            3.1-139     2019-04-09 [2]
+##  nloptr          1.2.1       2018-10-03 [1]
+##  nnet            7.3-12      2016-02-02 [2]
+##  parsnip       * 0.0.2       2019-03-22 [1]
+##  pillar          1.4.1       2019-05-28 [1]
+##  pkgbuild        1.0.3       2019-03-20 [1]
+##  pkgconfig       2.0.2       2018-08-16 [1]
+##  plyr            1.8.4       2016-06-08 [1]
+##  prettyunits     1.0.2       2015-07-13 [1]
+##  pROC            1.15.0      2019-06-01 [1]
+##  processx        3.3.1       2019-05-08 [1]
+##  prodlim         2018.04.18  2018-04-18 [1]
+##  promises        1.0.1       2018-04-13 [1]
+##  ps              1.3.0       2018-12-21 [1]
+##  purrr         * 0.3.2       2019-03-15 [1]
+##  quantmod        0.4-15      2019-06-17 [1]
+##  R6              2.4.0       2019-02-14 [1]
+##  Rcpp            1.0.1       2019-03-17 [1]
+##  readr         * 1.3.1       2018-12-21 [1]
+##  readxl          1.3.1       2019-03-13 [1]
+##  recipes       * 0.1.5       2019-03-21 [1]
+##  reshape2        1.4.3       2017-12-11 [1]
+##  rlang           0.4.0.9000  2019-06-28 [1]
+##  rmarkdown       1.13        2019-05-22 [1]
+##  ROCR            1.0-7       2015-03-26 [1]
+##  rpart           4.1-15      2019-04-12 [2]
+##  rprojroot       1.3-2       2018-01-03 [1]
+##  rsample       * 0.0.4       2019-01-07 [1]
+##  rsconnect       0.8.13      2019-01-10 [1]
+##  rstan           2.18.2      2018-11-07 [1]
+##  rstanarm        2.18.2      2018-11-10 [1]
+##  rstantools      1.5.1       2018-08-22 [1]
+##  rstudioapi      0.10        2019-03-19 [1]
+##  rvest           0.3.4       2019-05-15 [1]
+##  scales        * 1.0.0       2018-08-09 [1]
+##  sessioninfo     1.1.1       2018-11-05 [1]
+##  shiny           1.3.2       2019-04-22 [1]
+##  shinyjs         1.0         2018-01-08 [1]
+##  shinystan       2.5.0       2018-05-01 [1]
+##  shinythemes     1.1.2       2018-11-06 [1]
+##  SnowballC       0.6.0       2019-01-15 [1]
+##  StanHeaders     2.18.1-10   2019-06-14 [1]
+##  stringi         1.4.3       2019-03-12 [1]
+##  stringr       * 1.4.0       2019-02-10 [1]
+##  survival        2.44-1.1    2019-04-01 [2]
+##  threejs         0.3.1       2017-08-13 [1]
+##  tibble        * 2.1.3       2019-06-06 [1]
+##  tidymodels    * 0.0.2       2018-11-27 [1]
+##  tidyposterior   0.0.2       2018-11-15 [1]
+##  tidypredict     0.3.0       2019-01-10 [1]
+##  tidyr         * 0.8.3.9000  2019-06-28 [1]
+##  tidyselect      0.2.5       2018-10-11 [1]
+##  tidytext        0.2.1       2019-06-14 [1]
+##  tidyverse     * 1.2.1       2017-11-14 [1]
+##  timeDate        3043.102    2018-02-21 [1]
+##  tokenizers      0.2.1       2018-03-29 [1]
+##  TTR             0.23-4      2018-09-20 [1]
+##  vctrs           0.1.99.9000 2019-06-28 [1]
+##  withr           2.1.2       2018-03-15 [1]
+##  xaringan        0.10        2019-05-14 [1]
+##  xfun            0.7         2019-05-14 [1]
+##  xml2            1.2.0       2018-01-24 [1]
+##  xtable          1.8-4       2019-04-21 [1]
+##  xts             0.11-2      2018-11-05 [1]
+##  yaml            2.2.0       2018-07-25 [1]
+##  yardstick     * 0.0.3       2019-03-08 [1]
+##  zeallot         0.1.0       2018-01-28 [1]
+##  zoo             1.8-6       2019-05-28 [1]
+##  source                            
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (hadley/emo@02a5206)       
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (tidyverse/glue@ea0edcb)   
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (ropenscilabs/icon@a510f88)
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (r-lib/rlang@fc1aae2)      
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (tidyverse/tidyr@158f8b4)  
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (r-lib/vctrs@4c0e04a)      
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+## 
+## [1] /usr/local/lib/R/site-library
+## [2] /usr/local/lib/R/library
+```
+]
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

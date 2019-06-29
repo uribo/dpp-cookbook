@@ -1,0 +1,29 @@
+body {
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans Japanese", Meiryo, "Yu Gothic Medium", sans-serif;
+}
+
+h1, h2, h3 {
+  font-weight: bold;
+}
+
+.remark-code, .remark-inline-code { 
+  font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", Meiryo, monospace, serif; 
+  font-size: 60%;
+}
+
+.remark-slide-number {
+  font-size: 13pt;
+  font-family: 'Fira Sans';
+  color: #272822;
+  opacity: 1;
+}
+.inverse .remark-slide-number {
+  font-size: 13pt;
+  font-family: 'Fira Sans';
+  color: #FAFAFA;
+  opacity: 1;
+}
+.scroll-output {
+  height: 90%;
+  overflow-y: scroll;
+}

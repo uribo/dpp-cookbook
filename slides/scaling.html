@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>スケーリング処理</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Uryu Shinya" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis.css" rel="stylesheet" />
+    <link href="libs/remark-css/metropolis-fonts.css" rel="stylesheet" />
+    <link href="libs/font-awesome/css/fontawesome-all.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="ja-JP.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# スケーリング処理
+## Part of 📖Data Preprocessing Cookbook 👨‍🍳
+### Uryu Shinya
+### <span style="font-size: 70%;"><i class="fab  fa-github "></i> uribo <i class="fab  fa-twitter "></i> u_ribo</span>
+### 2019/06/29 (updated: 2019-06-29)
+
+---
+
+
+
+
+# 概要
+
+- データが取り得る値の規模 (scale)をデータ間で揃える処理
+    - 分布には影響しない
+- 異なる単位をもつデータを扱う場合に役立つ --&gt; 連続変数からなる多くのデータに該当する
+    - 体重 (kg)と身長 (cm)... 同じ値120であってもそれぞれ意味合いが異なるため比較できない
+- 多くのモデルではスケーリングが行われていることが前提となる
+    - リッジ回帰、主成分分析では特に注意
+    - 木ベースのモデルではスケーリングを気にしない
+
+
+
+&lt;table&gt;
+&lt;caption&gt;地価データにおける「地価」、「最寄駅からの距離」「地籍」「該当する市町村の夜間人口」の要約統計量&lt;/caption&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; variable &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; mean &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; min &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; max &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sd &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; unit &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; posted_land_price &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 415431.7453 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 613 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 55500000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1766361.432 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 円/m2 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; distance_from_station &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1565.5993 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1964.797 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; m &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; acreage &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 750.9514 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 46 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 413215 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7246.831 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; m2 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; night_population &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 259450.3810 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3214 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 903346 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 197975.792 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 人 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+比較対象の変数間で平均と分散が異なることに起因する問題
+
+
+```r
+x &lt;- df_lp_kanto$distance_from_station
+```
+
+---
+# 中心化 (centering)
+
+- 平均を0にする
+- データの値を定数（平均値が利用されることが多い）によって引く
+
+`$$\tilde{x} = x - mean(x)$$`
+
+.pull-left[
+
+```r
+x_center &lt;- x - mean(x)
+mean(x_center)
+```
+
+```
+## [1] 6.152186e-14
+```
+]
+
+.pull-right[
+
+```r
+df_lp_kanto %&gt;% 
+  recipe(~ distance_from_station) %&gt;% 
+* step_center(all_predictors()) %&gt;%
+  prep(training = df_lp_kanto) %&gt;% 
+  bake(new_data = df_lp_kanto) %&gt;% 
+  summarise(mean = mean(distance_from_station),
+            sd = sd(distance_from_station)) %&gt;% 
+  knitr::kable(format = "html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; mean &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sd &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1964.797 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]
+
+---
+# スケーリング (scaling)
+
+- 特徴量を分散で割ることにより、分散1を得る
+
+
+`$$s^2 = \frac{x}{var(x)}$$`
+
+.pull-left[
+
+```r
+sd(x / sd(x))
+```
+
+```
+## [1] 1
+```
+]
+
+.pull-right[
+
+```r
+df_lp_kanto %&gt;% 
+  recipe(~ distance_from_station) %&gt;% 
+* step_scale(all_predictors()) %&gt;%
+  prep(training = df_lp_kanto) %&gt;% 
+  bake(new_data = df_lp_kanto) %&gt;% 
+  summarise(mean = mean(distance_from_station),
+            sd = sd(distance_from_station)) %&gt;% 
+  knitr::kable(format = "html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; mean &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sd &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0.796825 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]
+
+---
+# 標準化 (standardization)
+
+- 中心化 + スケーリング。オートスケーリングとも呼ばれる
+- データの分布が正規分布に従うことを仮定する
+- 特徴量の値を**平均0、分散1**に変換
+- 元のデータが正規分布に従う場合は、標準化された値も正規分布に従う
+
+`$$\tilde{x} = \frac{x- mean(x)}{sqrt(var(x))}$$`
+.pull-left[
+
+
+
+```r
+# scale()が用意されている
+lp_dist_scaled &lt;- 
+  scale(x, center = TRUE, scale = TRUE)
+mean(lp_dist_scaled) # 限りなく0に近くなる
+```
+
+```
+## [1] 3.056636e-17
+```
+
+```r
+sd(lp_dist_scaled) # 分散は1
+```
+
+```
+## [1] 1
+```
+]
+
+.pull-right[
+
+```r
+df_lp_kanto %&gt;% 
+  recipe(~ distance_from_station) %&gt;% 
+* step_center(all_predictors()) %&gt;%
+* step_scale(all_predictors()) %&gt;%
+  prep(training = df_lp_kanto) %&gt;% 
+  bake(new_data = df_lp_kanto) %&gt;% 
+  summarise(mean = mean(distance_from_station),
+            sd = sd(distance_from_station)) %&gt;% 
+  knitr::kable(format = "html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; mean &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sd &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]
+
+---
+# Min-Maxスケーリング
+
+- 値の範囲を0から1に収まるように調整する
+- 対象の変数の最小値、最大値を利用する
+- 外れ値の影響を受けやすい
+- 最小値、最大値があらかじめ決まっている場合に有効
+    - e.g. 画像処理におけるRGBの強さ(0~255)
+
+`$$\tilde{x} = \frac{x - min(x)}{max(x) - min(x)}$$`
+
+```r
+lp_dist_minmax &lt;- 
+* scale(x, center = min(x), scale = (max(x) - min(x)))
+range(lp_dist_minmax)
+```
+
+```
+## [1] 0 1
+```
+
+---
+# スケーリングは分布には影響しない
+
+&lt;img src="scaling_files/figure-html/plot_scaling-1.png" style="display: block; margin: auto;" /&gt;
+
+---
+# スケーリング処理を行わない場合の問題
+
+- 重回帰モデル、主成分分析の例を紹介
+- 単位の異なる4つの変数
+
+&lt;table&gt;
+&lt;caption&gt;地価データにおける「地価」、「最寄駅からの距離」「地籍」「該当する市町村の夜間人口」の要約統計量&lt;/caption&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; variable &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; mean &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; min &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; max &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; sd &lt;/th&gt;
+   &lt;th style="text-align:left;"&gt; unit &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; posted_land_price &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 415431.7453 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 613 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 55500000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1766361.432 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 円/m2 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; distance_from_station &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1565.5993 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1964.797 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; m &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; acreage &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 750.9514 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 46 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 413215 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 7246.831 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; m2 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; night_population &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 259450.3810 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3214 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 903346 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 197975.792 &lt;/td&gt;
+   &lt;td style="text-align:left;"&gt; 人 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+---
+# スケーリング処理を行わない場合の問題1: 重回帰モデル
+
+- 変数間の係数の直接的な比較が困難
+- 標準化回帰係数を利用する方法もある
+
+
+```r
+mod_formula &lt;- formula(posted_land_price ~ distance_from_station + acreage + night_population)
+
+lm(mod_formula, data = df_lp_kanto) %&gt;% 
+  tidy() %&gt;% 
+  knitr::kable(format = "html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; term &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; estimate &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; std.error &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; statistic &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; p.value &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; (Intercept) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 6.201117e+05 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.711983e+04 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 16.705672 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0000000 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; distance_from_station &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.153555e+02 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.845050e+00 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -11.717110 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0000000 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; acreage &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.405331e+00 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 2.629775e+00 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.294913 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.1953854 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; night_population &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.026657e-01 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 9.761910e-02 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.051697 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.2929687 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+---
+# スケーリング処理を行わない場合の問題1: 重回帰モデル
+
+
+```r
+df_lp_kanto %&gt;% 
+  recipe(mod_formula) %&gt;% 
+  step_center(all_predictors()) %&gt;% 
+  step_scale(all_predictors()) %&gt;% 
+  prep() %&gt;% 
+  juice() %&gt;% 
+  lm(mod_formula, data = .) %&gt;% 
+  tidy() %&gt;% 
+  knitr::kable(format = "html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:left;"&gt; term &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; estimate &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; std.error &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; statistic &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; p.value &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; (Intercept) &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 415431.75 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19034.07 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 21.825690 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0000000 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; distance_from_station &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -226650.18 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19343.52 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -11.717110 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.0000000 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; acreage &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 24677.86 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19057.54 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.294913 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.1953854 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:left;"&gt; night_population &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -20325.33 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 19326.22 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.051697 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.2929687 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+
+---
+# スケーリング処理を行わない場合の問題2: 主成分分析
+
+- 主成分分析はスケール不変性を持たない
+    - 異なる単位の変数を入力に与えると大きな値の入った変数の影響が強くなる
+- 🦉 `prcomp()` では標準化するためのオプションが用意されているが、歴史的な経緯により引数`scale.`が規定値では`FALSE`なのに注意 ⚠️
+
+.pull-left[
+
+```r
+# デフォルトの挙動
+pca_res &lt;- 
+  prcomp(~ distance_from_station + acreage + night_population, 
+       data = df_lp_kanto,
+*      center = TRUE,
+*      scale. = FALSE)
+# 主成分軸上のSDが大きく異なっていることに注意（単位の影響を強く受けている）
+pca_res
+```
+
+```
+## Standard deviations (1, .., p=3):
+## [1] 197976.136   7245.897   1933.332
+## 
+## Rotation (n x k) = (3 x 3):
+##                                 PC1          PC2          PC3
+## distance_from_station -0.0017118022 0.0126588595 -0.999918408
+## acreage               -0.0007386687 0.9999195844  0.012660139
+## night_population       0.9999982620 0.0007602801 -0.001702314
+```
+]
+
+.pull-right[
+
+```r
+# 第1主成分のみで累積寄与率が99%を超える
+summary(pca_res)
+```
+
+```
+## Importance of components:
+##                              PC1       PC2       PC3
+## Standard deviation     1.980e+05 7.246e+03 1933.3320
+## Proportion of Variance 9.986e-01 1.340e-03    0.0001
+## Cumulative Proportion  9.986e-01 9.999e-01    1.0000
+```
+]
+
+---
+# スケーリング処理を行わない場合の問題2: 主成分分析
+
+.pull-left[
+
+```r
+pca_res_scaled &lt;- 
+  prcomp(~ distance_from_station + acreage + night_population, 
+       data = df_lp_kanto,
+*      scale. = TRUE)
+# SDの値が変更
+pca_res_scaled
+```
+
+```
+## Standard deviations (1, .., p=3):
+## [1] 1.0884300 0.9949390 0.9085244
+## 
+## Rotation (n x k) = (3 x 3):
+##                              PC1         PC2        PC3
+## distance_from_station -0.6939753  0.09743571  0.7133755
+## acreage               -0.2496712 -0.96188952 -0.1115026
+## night_population       0.6753241 -0.25548939  0.6918544
+```
+]
+
+.pull-right[
+
+```r
+# 第2主成分を含めた状態で累積寄与率72%
+summary(pca_res_scaled)
+```
+
+```
+## Importance of components:
+##                           PC1    PC2    PC3
+## Standard deviation     1.0884 0.9949 0.9085
+## Proportion of Variance 0.3949 0.3300 0.2751
+## Cumulative Proportion  0.3949 0.7249 1.0000
+```
+
+]
+
+---
+# スケーリング処理を行わない場合の問題2: 主成分分析
+
+- 主成分得点もスケーリング処理の有無により異なる
+
+.pull-left[
+
+```r
+head(pca_res$x) %&gt;% 
+  knitr::kable(format = "html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; PC1 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; PC2 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; PC3 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -249681.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -533.4225 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -6714.295 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -252951.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -632.4573 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -11010.303 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -252951.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -572.4622 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -11009.543 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -253920.3 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -620.1541 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -3507.876 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -253911.1 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -605.7718 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1912.733 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -252952.8 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -612.7990 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -12010.133 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+]
+
+.pull-right[
+
+```r
+df_lp_kanto %&gt;% 
+  recipe(~ distance_from_station + acreage + night_population) %&gt;% 
+  step_center(all_predictors()) %&gt;% 
+  step_scale(all_predictors()) %&gt;% 
+  step_pca(all_predictors()) %&gt;% 
+  prep() %&gt;% 
+  juice() %&gt;% 
+  head() %&gt;% 
+  knitr::kable(format = "html")
+```
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style="text-align:right;"&gt; PC1 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; PC2 &lt;/th&gt;
+   &lt;th style="text-align:right;"&gt; PC3 &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -3.3566142 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.7336012 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.7245159 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -4.8813188 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.9710936 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.2766773 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -4.8833860 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.9631296 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.2757541 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -2.2393550 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.5860953 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.5484951 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -0.3278456 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.3062968 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; -1.4206675 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style="text-align:right;"&gt; -5.2347646 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.0197552 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 3.6396480 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+]
+
+
+---
+# Session info
+
+.scroll-output[
+
+```
+## ─ Session info ──────────────────────────────────────────────────────────
+##  setting  value                       
+##  version  R version 3.6.0 (2019-04-26)
+##  os       Debian GNU/Linux 9 (stretch)
+##  system   x86_64, linux-gnu           
+##  ui       X11                         
+##  language (EN)                        
+##  collate  en_US.UTF-8                 
+##  ctype    en_US.UTF-8                 
+##  tz       Etc/UTC                     
+##  date     2019-06-29                  
+## 
+## ─ Packages ──────────────────────────────────────────────────────────────
+##  package       * version     date       lib
+##  assertr         2.6         2019-01-22 [1]
+##  assertthat      0.2.1       2019-03-21 [1]
+##  backports       1.1.4       2019-04-10 [1]
+##  base64enc       0.1-3       2015-07-28 [1]
+##  bayesplot       1.7.0       2019-05-23 [1]
+##  boot            1.3-22      2019-04-02 [2]
+##  broom         * 0.5.2       2019-04-07 [1]
+##  callr           3.2.0       2019-03-15 [1]
+##  cellranger      1.1.0       2016-07-27 [1]
+##  class           7.3-15      2019-01-01 [2]
+##  cli             1.1.0       2019-03-19 [1]
+##  codetools       0.2-16      2018-12-24 [2]
+##  colorspace      1.4-1       2019-03-18 [1]
+##  colourpicker    1.0         2017-09-27 [1]
+##  conflicted    * 1.0.4       2019-06-21 [1]
+##  cowplot         0.9.4       2019-01-08 [1]
+##  crayon          1.3.4       2017-09-16 [1]
+##  crosstalk       1.0.0       2016-12-21 [1]
+##  dials         * 0.0.2       2018-12-09 [1]
+##  digest          0.6.19      2019-05-20 [1]
+##  dplyr         * 0.8.1       2019-05-14 [1]
+##  DT              0.7         2019-06-11 [1]
+##  dygraphs        1.1.1.6     2018-07-11 [1]
+##  emo             0.0.0.9000  2019-06-28 [1]
+##  evaluate        0.14        2019-05-28 [1]
+##  forcats       * 0.4.0       2019-02-17 [1]
+##  generics        0.0.2       2018-11-29 [1]
+##  ggplot2       * 3.2.0       2019-06-16 [1]
+##  ggridges        0.5.1       2018-09-27 [1]
+##  glue            1.3.1.9000  2019-06-28 [1]
+##  gower           0.2.1       2019-05-14 [1]
+##  gridExtra       2.3         2017-09-09 [1]
+##  gtable          0.3.0       2019-03-25 [1]
+##  gtools          3.8.1       2018-06-26 [1]
+##  haven           2.1.0       2019-02-19 [1]
+##  here            0.1         2017-05-28 [1]
+##  highr           0.8         2019-03-20 [1]
+##  hms             0.4.2       2018-03-10 [1]
+##  htmltools       0.3.6       2017-04-28 [1]
+##  htmlwidgets     1.3         2018-09-30 [1]
+##  httpuv          1.5.1       2019-04-05 [1]
+##  httr            1.4.0       2018-12-11 [1]
+##  icon            0.1.0       2019-06-28 [1]
+##  igraph          1.2.4.1     2019-04-22 [1]
+##  infer         * 0.4.0.1     2019-04-22 [1]
+##  inline          0.3.15      2018-05-18 [1]
+##  ipred           0.9-9       2019-04-28 [1]
+##  janeaustenr     0.1.5       2017-06-10 [1]
+##  jsonlite        1.6         2018-12-07 [1]
+##  knitr           1.23        2019-05-18 [1]
+##  labeling        0.3         2014-08-23 [1]
+##  later           0.8.0       2019-02-11 [1]
+##  lattice         0.20-38     2018-11-04 [2]
+##  lava            1.6.5       2019-02-12 [1]
+##  lazyeval        0.2.2       2019-03-15 [1]
+##  lme4            1.1-21      2019-03-05 [1]
+##  loo             2.1.0       2019-03-13 [1]
+##  lubridate       1.7.4       2018-04-11 [1]
+##  magrittr        1.5         2014-11-22 [1]
+##  markdown        1.0         2019-06-07 [1]
+##  MASS            7.3-51.4    2019-03-31 [2]
+##  Matrix          1.2-17      2019-03-22 [2]
+##  matrixStats     0.54.0      2018-07-23 [1]
+##  memoise         1.1.0       2017-04-21 [1]
+##  mime            0.7         2019-06-11 [1]
+##  miniUI          0.1.1.1     2018-05-18 [1]
+##  minqa           1.2.4       2014-10-09 [1]
+##  modelr          0.1.4       2019-02-18 [1]
+##  munsell         0.5.0       2018-06-12 [1]
+##  nlme            3.1-139     2019-04-09 [2]
+##  nloptr          1.2.1       2018-10-03 [1]
+##  nnet            7.3-12      2016-02-02 [2]
+##  parsnip       * 0.0.2       2019-03-22 [1]
+##  pillar          1.4.1       2019-05-28 [1]
+##  pkgbuild        1.0.3       2019-03-20 [1]
+##  pkgconfig       2.0.2       2018-08-16 [1]
+##  plyr            1.8.4       2016-06-08 [1]
+##  prettyunits     1.0.2       2015-07-13 [1]
+##  pROC            1.15.0      2019-06-01 [1]
+##  processx        3.3.1       2019-05-08 [1]
+##  prodlim         2018.04.18  2018-04-18 [1]
+##  promises        1.0.1       2018-04-13 [1]
+##  ps              1.3.0       2018-12-21 [1]
+##  purrr         * 0.3.2       2019-03-15 [1]
+##  R6              2.4.0       2019-02-14 [1]
+##  Rcpp            1.0.1       2019-03-17 [1]
+##  readr         * 1.3.1       2018-12-21 [1]
+##  readxl          1.3.1       2019-03-13 [1]
+##  recipes       * 0.1.5       2019-03-21 [1]
+##  reshape2        1.4.3       2017-12-11 [1]
+##  rlang           0.4.0.9000  2019-06-28 [1]
+##  rmarkdown       1.13        2019-05-22 [1]
+##  rpart           4.1-15      2019-04-12 [2]
+##  rprojroot       1.3-2       2018-01-03 [1]
+##  rsample       * 0.0.4       2019-01-07 [1]
+##  rsconnect       0.8.13      2019-01-10 [1]
+##  rstan           2.18.2      2018-11-07 [1]
+##  rstanarm        2.18.2      2018-11-10 [1]
+##  rstantools      1.5.1       2018-08-22 [1]
+##  rstudioapi      0.10        2019-03-19 [1]
+##  rvest           0.3.4       2019-05-15 [1]
+##  scales        * 1.0.0       2018-08-09 [1]
+##  sessioninfo     1.1.1       2018-11-05 [1]
+##  shiny           1.3.2       2019-04-22 [1]
+##  shinyjs         1.0         2018-01-08 [1]
+##  shinystan       2.5.0       2018-05-01 [1]
+##  shinythemes     1.1.2       2018-11-06 [1]
+##  SnowballC       0.6.0       2019-01-15 [1]
+##  StanHeaders     2.18.1-10   2019-06-14 [1]
+##  stringi         1.4.3       2019-03-12 [1]
+##  stringr       * 1.4.0       2019-02-10 [1]
+##  survival        2.44-1.1    2019-04-01 [2]
+##  threejs         0.3.1       2017-08-13 [1]
+##  tibble        * 2.1.3       2019-06-06 [1]
+##  tidymodels    * 0.0.2       2018-11-27 [1]
+##  tidyposterior   0.0.2       2018-11-15 [1]
+##  tidypredict     0.3.0       2019-01-10 [1]
+##  tidyr         * 0.8.3.9000  2019-06-28 [1]
+##  tidyselect      0.2.5       2018-10-11 [1]
+##  tidytext        0.2.1       2019-06-14 [1]
+##  tidyverse     * 1.2.1       2017-11-14 [1]
+##  timeDate        3043.102    2018-02-21 [1]
+##  tokenizers      0.2.1       2018-03-29 [1]
+##  vctrs           0.1.99.9000 2019-06-28 [1]
+##  withr           2.1.2       2018-03-15 [1]
+##  xaringan        0.10        2019-05-14 [1]
+##  xfun            0.7         2019-05-14 [1]
+##  xml2            1.2.0       2018-01-24 [1]
+##  xtable          1.8-4       2019-04-21 [1]
+##  xts             0.11-2      2018-11-05 [1]
+##  yaml            2.2.0       2018-07-25 [1]
+##  yardstick     * 0.0.3       2019-03-08 [1]
+##  zeallot         0.1.0       2018-01-28 [1]
+##  zoo             1.8-6       2019-05-28 [1]
+##  source                            
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (hadley/emo@02a5206)       
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (tidyverse/glue@ea0edcb)   
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (ropenscilabs/icon@a510f88)
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (r-lib/rlang@fc1aae2)      
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (tidyverse/tidyr@158f8b4)  
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  Github (r-lib/vctrs@4c0e04a)      
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+##  CRAN (R 3.6.0)                    
+## 
+## [1] /usr/local/lib/R/site-library
+## [2] /usr/local/lib/R/library
+```
+]
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"ratio": "16:9"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
