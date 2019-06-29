@@ -12,15 +12,26 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
 [{textrecipes}](https://github.com/juliasilge/tidytext)
 パッケージを使ったデータ前処理、特徴量エンジニアリングの手法を紹介します。
 
-（余力があればPython、scikit-learn等を利用した処理手順についても書きます）
+（余力があればPython、scikit-learn preprocessing等を利用した処理手順についても書きます）
 
 ## TOC
 
-  - tidymodels全般
-  - 特徴量選択
-  - 特徴量エンジニアリング
+  - パッケージ全般
+  - データ整形
+  - [スケーリング処理](slides/scaling.Rmd)
+  - 特徴量選択（フィルタ法）
+      - 次元削減
+  - [不均衡データに対する調整](slides/class-imbalance.Rmd)
   - 欠損値補完
-  - リサンプリング
+      - kNN
+  - データ分割
+  - 特徴量エンジニアリング
+      - numeric
+      - categorical
+      - text
+      - date and time
+      - coordinates
+
 ## Dataset
 
 ### 地価公示データ (land price)
@@ -72,3 +83,4 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
   - R 3.6.0
   - local (macOS Mojave)
   - docker… Dockerfile is
+    [here](https://github.com/uribo/dpp-cookbook/blob/master/Dockerfile)
