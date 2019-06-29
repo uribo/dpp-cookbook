@@ -1,4 +1,4 @@
-FROM rocker/tidyverse:3.6.0
+FROM uribo/practical-ds
 
 RUN set -x && \
   apt-get update && \
@@ -12,11 +12,8 @@ RUN set -x && \
 
 RUN set -x && \
   install2.r \
-    conflicted \
-    here \
-    xaringan \
-    recipes \
-    textrecipes && \
+    xaringan && \
   installGithub.r \
-    "hadley/emo" && \
+    "hadley/emo" \
+    "ropenscilabs/icon" && \
   rm -rf /tmp/downloaded_packages/ /tmp/*.rds
