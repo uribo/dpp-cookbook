@@ -26,10 +26,10 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
 
 - パッケージ全般
 - データ整形
-- [スケーリング処理](slides/scaling.Rmd)
+- [スケーリング処理](slides/scaling)
 - 特徴量選択（フィルタ法）
     - 次元削減
-- [不均衡データに対する調整](slides/class-imbalance.Rmd)
+- [不均衡データに対する調整](slides/class-imbalance)
 - 欠損値補完
     - kNN
 - データ分割
