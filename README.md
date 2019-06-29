@@ -53,7 +53,7 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
 
 気象庁ホームページ 過去の気象データ・ダウンロード
 <http://www.data.jma.go.jp/gmd/risk/obsdl/index.php> より対象地域、対象とする期間
-(2016年7月) のデータを瓜生真也加工して作成しました。
+(2016年7月) のデータを瓜生真也が加工・作成しました。
 
   - 九州地方のデータを利用
 
@@ -65,13 +65,13 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
 
 気象庁ホームページ 過去の気象データ検索
 <http://www.data.jma.go.jp/obd/stats/etrn/index.php>
-より、観測地点「東京」のデータを瓜生真也加工して作成しました。
+より、観測地点「東京」のデータを瓜生真也が加工・作成しました。
 
 -----
 
 ## Information
 
-**Author**: Uryu Shinya (@uribo, Twitter:
+**Author**: Uryu Shinya ([@uribo](https://github.com/uribo), Twitter:
 [@u\_ribo](http://twitter.com/u_ribo) )
 
 **License**: MIT
