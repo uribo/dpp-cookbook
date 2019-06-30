@@ -178,7 +178,7 @@ beer_train <- training(beer_split)
 beer_test <- testing(beer_split)
 ```
 
-```{r plot_time_split, echo=TRUE, eval=FALSE}
+```{r plot_time_split_ref, echo=TRUE, eval=FALSE}
 beer_train %>% 
   mutate(type = "train") %>% 
   bind_rows(beer_test %>% mutate(type = "test")) %>% 
@@ -193,7 +193,7 @@ beer_train %>%
 ]
 
 .pull-right[
-```{r, ref.label="plot_time_split", echo = FALSE, eval = TRUE, fig.width = 2, fig.height = 1.7, warning = FALSE, fig.align = 'center', dpi = 320}
+```{r plot_time_split, ref.label="plot_time_split_ref", echo = FALSE, eval = TRUE, fig.width = 2, fig.height = 1.7, warning = FALSE, fig.align = 'center', dpi = 320}
 ```
 ]
 
