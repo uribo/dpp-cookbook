@@ -1,6 +1,6 @@
 ---
 title: "不均衡データに対する調整"
-subtitle: "Part of `r emo::ji('book')`Data Preprocessing Cookbook `r emo::ji('cook')`"
+subtitle: "Part of `r emo::ji('book')`Data Preprocessing Cookbook `r set.seed(1); emo::ji('cook')`"
 author: "Uryu Shinya"
 institute: "<span style = 'font-size: 70%;'>`r icon::fa('github')` uribo `r icon::fa('twitter')` u_ribo</span>"
 date: "2019-06-29 (updated: `r Sys.Date()`)"
