@@ -3,7 +3,7 @@ title: "スケーリング処理"
 subtitle: "Part of `r emo::ji('book')`Data Preprocessing Cookbook `r emo::ji('cook')`"
 author: "Uryu Shinya"
 institute: "<span style = 'font-size: 70%;'>`r icon::fa('github')` uribo `r icon::fa('twitter')` u_ribo</span>"
-date: "2019/06/29 (updated: `r Sys.Date()`)"
+date: "2019-06-29 (updated: `r Sys.Date()`)"
 output:
   xaringan::moon_reader:
     css: [default, metropolis, metropolis-fonts, ja-JP.css]
@@ -17,7 +17,6 @@ output:
 
 ```{r setup, include=FALSE}
 source(here::here("R/setup.R"))
-options(htmltools.dir.version = FALSE)
 ```
 
 # 概要

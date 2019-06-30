@@ -1,3 +1,4 @@
+options(htmltools.dir.version = FALSE, digits = 3)
 library(tidyverse)
 library(tidymodels)
 library(conflicted)
