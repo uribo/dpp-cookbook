@@ -15,10 +15,10 @@
 class: center, middle, inverse, title-slide
 
 # 不均衡データに対する調整
-## Part of 📖Data Preprocessing Cookbook 👩‍🍳
+## Part of 📖Data Preprocessing Cookbook 👨‍🍳
 ### Uryu Shinya
 ### <span style="font-size: 70%;"><i class="fab  fa-github "></i> uribo <i class="fab  fa-twitter "></i> u_ribo</span>
-### 2019/06/29 (updated: 2019-06-29)
+### 2019-06-29 (updated: 2019-06-30)
 
 ---
 
@@ -49,6 +49,7 @@ class: center, middle, inverse, title-slide
 .pull-left[
 
 ```r
+set.seed(123)
 df_imbl &lt;- tibble(class = c(rep(TRUE, 1000),
                             rep(FALSE, 9000)) %&gt;% 
     as.numeric() %&gt;% 
@@ -101,17 +102,17 @@ fit(
   &lt;tr&gt;
    &lt;td style="text-align:left;"&gt; precision &lt;/td&gt;
    &lt;td style="text-align:left;"&gt; binary &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 0.8993333 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.898 &lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
    &lt;td style="text-align:left;"&gt; accuracy &lt;/td&gt;
    &lt;td style="text-align:left;"&gt; binary &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 0.8993333 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 0.898 &lt;/td&gt;
   &lt;/tr&gt;
   &lt;tr&gt;
    &lt;td style="text-align:left;"&gt; recall &lt;/td&gt;
    &lt;td style="text-align:left;"&gt; binary &lt;/td&gt;
-   &lt;td style="text-align:right;"&gt; 1.0000000 &lt;/td&gt;
+   &lt;td style="text-align:right;"&gt; 1.000 &lt;/td&gt;
   &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
@@ -213,7 +214,7 @@ df_smote &lt;-
 ##  collate  en_US.UTF-8                 
 ##  ctype    en_US.UTF-8                 
 ##  tz       Etc/UTC                     
-##  date     2019-06-29                  
+##  date     2019-06-30                  
 ## 
 ## ─ Packages ──────────────────────────────────────────────────────────────
 ##  package       * version     date       lib
@@ -244,14 +245,14 @@ df_smote &lt;-
 ##  dplyr         * 0.8.1       2019-05-14 [1]
 ##  DT              0.7         2019-06-11 [1]
 ##  dygraphs        1.1.1.6     2018-07-11 [1]
-##  emo             0.0.0.9000  2019-06-28 [1]
+##  emo             0.0.0.9000  2019-06-29 [1]
 ##  evaluate        0.14        2019-05-28 [1]
 ##  forcats       * 0.4.0       2019-02-17 [1]
 ##  gdata           2.18.0      2017-06-06 [1]
 ##  generics        0.0.2       2018-11-29 [1]
 ##  ggplot2       * 3.2.0       2019-06-16 [1]
 ##  ggridges        0.5.1       2018-09-27 [1]
-##  glue            1.3.1.9000  2019-06-28 [1]
+##  glue            1.3.1.9000  2019-06-29 [1]
 ##  gower           0.2.1       2019-05-14 [1]
 ##  gplots          3.0.1.1     2019-01-27 [1]
 ##  gridExtra       2.3         2017-09-09 [1]
@@ -265,7 +266,7 @@ df_smote &lt;-
 ##  htmlwidgets     1.3         2018-09-30 [1]
 ##  httpuv          1.5.1       2019-04-05 [1]
 ##  httr            1.4.0       2018-12-11 [1]
-##  icon            0.1.0       2019-06-28 [1]
+##  icon            0.1.0       2019-06-29 [1]
 ##  igraph          1.2.4.1     2019-04-22 [1]
 ##  infer         * 0.4.0.1     2019-04-22 [1]
 ##  inline          0.3.15      2018-05-18 [1]
@@ -315,7 +316,7 @@ df_smote &lt;-
 ##  readxl          1.3.1       2019-03-13 [1]
 ##  recipes       * 0.1.5       2019-03-21 [1]
 ##  reshape2        1.4.3       2017-12-11 [1]
-##  rlang           0.4.0.9000  2019-06-28 [1]
+##  rlang           0.4.0.9000  2019-06-29 [1]
 ##  rmarkdown       1.13        2019-05-22 [1]
 ##  ROCR            1.0-7       2015-03-26 [1]
 ##  rpart           4.1-15      2019-04-12 [2]
@@ -343,14 +344,14 @@ df_smote &lt;-
 ##  tidymodels    * 0.0.2       2018-11-27 [1]
 ##  tidyposterior   0.0.2       2018-11-15 [1]
 ##  tidypredict     0.3.0       2019-01-10 [1]
-##  tidyr         * 0.8.3.9000  2019-06-28 [1]
+##  tidyr         * 0.8.3.9000  2019-06-29 [1]
 ##  tidyselect      0.2.5       2018-10-11 [1]
 ##  tidytext        0.2.1       2019-06-14 [1]
 ##  tidyverse     * 1.2.1       2017-11-14 [1]
 ##  timeDate        3043.102    2018-02-21 [1]
 ##  tokenizers      0.2.1       2018-03-29 [1]
 ##  TTR             0.23-4      2018-09-20 [1]
-##  vctrs           0.1.99.9000 2019-06-28 [1]
+##  vctrs           0.1.99.9000 2019-06-29 [1]
 ##  withr           2.1.2       2018-03-15 [1]
 ##  xaringan        0.10        2019-05-14 [1]
 ##  xfun            0.7         2019-05-14 [1]

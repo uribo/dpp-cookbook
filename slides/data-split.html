@@ -15,7 +15,7 @@
 class: center, middle, inverse, title-slide
 
 # データ分割
-## Part of 📖Data Preprocessing Cookbook 👩‍🍳
+## Part of 📖Data Preprocessing Cookbook 👨‍🍳
 ### Uryu Shinya
 ### <span style="font-size: 70%;"><i class="fab  fa-github "></i> uribo <i class="fab  fa-twitter "></i> u_ribo</span>
 ### 2019-06-30 (updated: 2019-06-30)
@@ -216,6 +216,7 @@ beer_test &lt;- testing(beer_split)
 beer_train %&gt;% 
   mutate(type = "train") %&gt;% 
   bind_rows(beer_test %&gt;% mutate(type = "test")) %&gt;% 
+  mutate(type = forcats::fct_inorder(type)) %&gt;% 
   ggplot() +
   geom_point(aes(date, expense, color = type), size = 0.4) +
   scale_color_ds() +
