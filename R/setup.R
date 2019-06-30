@@ -58,3 +58,13 @@ df_lp_kanto <-
                   .longitude = "d", 
                   .latitude = "d")) %>% 
   assertr::verify(dim(.) == c(8476, 45))
+
+df_hazard_kys <- 
+  readr::read_csv(here::here("data-raw/hazard_kyusyu201607.csv"),
+                  col_types = c("Dclccccdcddlllllddddddddddd")) %>% 
+  assertr::verify(dim(.) == c(2214, 27))
+
+df_beer2018q2 <- 
+  read_csv(here::here("data-raw/beer2018q2.csv"),
+           col_types = c("Ddcddddd")) %>% 
+  assertr::verify(dim(.) == c(92, 8))

@@ -1,0 +1,268 @@
+---
+title: "データ分割"
+subtitle: "Part of `r emo::ji('book')`Data Preprocessing Cookbook `r emo::ji('cook')`"
+author: "Uryu Shinya"
+institute: "<span style = 'font-size: 70%;'>`r icon::fa('github')` uribo `r icon::fa('twitter')` u_ribo</span>"
+date: "2019-06-30 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts, ja-JP.css]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+---
+
+```{r setup, include = FALSE}
+source(here::here("R/setup.R"))
+
+df_beer2018q2 <- df_beer2018q2 %>% select(date, expense, precipitation_sum_mm)
+```
+
+# 概要
+
+- 予測モデルの性能を評価、過学習を防ぐためにデータ分割の処理が必要となる
+    - データセットをモデル構築用と評価用のデータに分ける
+- データセットの大きさ、特性（クラスやグループが存在するか、時系列かどうか）に応じてリサンプリングの方法を変える
+- モデル構築用のデータに評価用のデータの情報が漏洩してはいけない（過学習へと繋がる）
+- リサンプリングのたびにデータセットへの操作を行う
+
+---
+# データ分割
+
+- 手元のデータからモデルの性能を評価するためのアプローチ
+    - **モデル構築**と**性能評価**のためのデータに分割
+- 分割の方法、比率についての一定の基準はない
+    - ランダムサンプリングが基本
+        - データの特性に偏りがないことを保証するように留意する
+        - 正当な理由がある場合においてはランダムでないサンプリングも有効
+
+---
+# 訓練データとテストデータ
+
+- 訓練データ... モデルと特徴量を開発するために利用される
+    - パラメータの推定、モデルの比較、最終的なモデルに到るまでに必要な作業は分析セットで行う
+- テストデータ... 構築されたモデルの性能を見積もるために使用する
+
+## データ分割時の注意
+
+- 訓練データの中にテストデータの情報が含まれていてはいけない
+    - 手元の評価では良いモデルができるが、未知データに対する精度が低下する
+    - 時系列データでは「未来」のデータは必ずテストデータに与える (後述)
+
+---
+# Hold-out検証
+
+.pull-left[
+- データを訓練データとテストデータに分割
+- 訓練・テストデータへの割付は**ランダム**
+]
+
+.pull-right[
+
+```{r}
+set.seed(123)
+lp_split <- initial_split(df_lp_kanto, prop = 3/4) #<<
+lp_split # 訓練テストデータの件数/テストデータの件数/データ全体の件数
+
+lp_train <- training(lp_split) #<<
+lp_test <- testing(lp_split) #<<
+```
+]
+
+
+![](images/hold-out.png)
+
+---
+# 再標本化法 (リサンプリング resampling)
+
+- リサンプリングされたデータを分析セット (analysis set) と 評価セット (assesment set) に分割する <sup>*</sup>
+    - 分析セット... 学習データと同様、モデル構築のために利用する
+    - 評価セット... テストデータ同じ機能（モデルの性能評価に使う）
+- データを複製する方法、分析・評価セットへの割り当て方法の違いが様々
+    - ブートストラップ法
+    - 交差検証法
+    - Leave One Out (LOO)... データセットの1点をテストに使用する。少数のデータセットでは有効だが現在ではほぼ使われない
+
+.footnote[再標本化法後に分割したデータに対してもデータ分割と同じ「訓練」「テスト」が使われるのが一般的だが、1) 再標本化法は訓練データセットを対象に行われる、2) 複製されたサンプル間で役割が異なるデータを参照することから、用語の混乱を避けるためにここでは「分析」と「評価」を使う]
+
+---
+# 交差検証
+
+- モデルの過学習を防ぐために**複数のfold**を用意
+    - foldには分析セットと評価セットが含まれる
+    - foldごとに用意される評価セットでの汎化性能を算出、平均することでモデルの出来を判断
+    - Hold-out検証で生じうる偏り（訓練とテストデータの分割が1度きり）に対する懸念を弱める
+- データがクラスやグループ（同一ユーザの複数のデータなど）を持つ場合でも対応可能
+- 以下、代表的なものを紹介
+
+---
+# k分割交差検証
+
+- データセットをk個に分割したfoldをkの回数分複製する
+    - kは5~10に設定するのが一般的
+    - データセットが巨大な場合、計算時間が長くなる
+- k-1を分析用、kを評価用に使用する
+    - 評価セットはfoldごとに変わる（評価セットはfold間で相互に排他的）
+- **データセットの順番に従って分割**
+
+```{r}
+set.seed(124)
+lp_folds <- vfold_cv(df_lp_kanto, v = 4) #<<
+lp_folds
+
+nrow(df_lp_kanto) / 5
+```
+
+---
+# k分割交差検証
+
+
+![](images/k-fold.png)
+
+---
+# 層化k分割交差検証
+
+.pull-left[
+- クラスごとの出現確率を維持した状態でデータを分析・評価セットに分割
+]
+
+
+.pull-right[
+```{r, eval = FALSE, echo = TRUE}
+vfold_cv(df_lp_kanto, v = 4,strata = ".prefecture") #<<
+```
+]
+
+![](images/stratified-k-fold.png)
+
+---
+# グループk分割交差検証
+
+- 共通のユーザやサイトから観測されたデータをグループの大きさに応じて分割
+
+```{r, eval = FALSE, echo = TRUE}
+group_vfold_cv(df_hazard_kys, group = "meshCode", v = 4) #<<
+```
+![](images/group-k-fold.png)
+
+
+
+---
+# モンテカルロ交差検証
+
+- リサンプリングしたデータ間での、学習・テストデータへの割付に対する重複を許す
+- 各リサンプリングの結果を独立して扱える
+
+```{r, eval = FALSE, echo = TRUE}
+mc_cv(df_lp_kanto, times = 4) #<<
+```
+
+![](images/monte-carto-cv.png)
+
+
+---
+# 時系列データの分割
+
+- `r emo::ji("ng")` ランダム、データ順での分割では学習データに将来のデータが含まれることになり、データ漏洩となる
+- **最新の期間をテストデータ**として扱うようにデータを分割
+
+.pull-left[
+```{r}
+beer_split <- 
+  initial_time_split(df_beer2018q2, prop = 3/4) #<<
+
+beer_train <- training(beer_split)
+beer_test <- testing(beer_split)
+```
+
+```{r plot_time_split, echo=TRUE, eval=FALSE}
+beer_train %>% 
+  mutate(type = "train") %>% 
+  bind_rows(beer_test %>% mutate(type = "test")) %>% 
+  ggplot() +
+  geom_point(aes(date, expense, color = type), size = 0.4) +
+  scale_color_ds() +
+  scale_x_date(date_breaks = "month") +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1),
+        legend.position = "top")
+```
+]
+
+.pull-right[
+```{r, ref.label="plot_time_split", echo = FALSE, eval = TRUE, fig.width = 2, fig.height = 1.7, warning = FALSE, fig.align = 'center', dpi = 320}
+```
+]
+
+
+
+---
+# Rolling Origin Forescast
+
+.pull-left[
+- 時系列データにおいて単純な交差検証は有効ではない
+- 時間軸に対し、スライドさせながらリサンプリング
+- リサンプリングされたデータ間での重複が多くなる
+
+```{r}
+beer_roll_split <- rolling_origin(df_beer2018q2, #<<
+                 initial = 14, #<<
+                 assess = 7) #<<
+
+# initialの件数だけrolling
+analysis(beer_roll_split$splits[[1]])
+```
+]
+
+.pull-right[
+```{r}
+assessment(beer_roll_split$splits[[1]])
+```
+]
+
+---
+# Rolling Origin Forescast
+
+![](images/rolling-origin-forecast-cv.png)
+
+---
+# Rolling Origin Forescast
+
+.pull-left[
+- 時系列に並べたデータをスライドさせずに累積していく方法
+
+
+```{r}
+beer_roll_split <- rolling_origin(df_beer2018q2, #<<
+                 initial = 14, #<<
+                 assess = 7, #<<
+                 cumulative = TRUE) #<<
+```
+
+```{r}
+analysis(beer_roll_split$splits[[2]])
+```
+]
+
+.pull-right[
+```{r}
+assessment(beer_roll_split$splits[[2]])
+```
+]
+
+---
+# Rolling Origin Forescast
+
+![](images/rolling-origin-forecast-cv-cumulative.png)
+
+
+---
+# Session info
+
+.scroll-output[
+```{r session, eval = TRUE, echo = FALSE}
+sessioninfo::session_info()
+```
+]
