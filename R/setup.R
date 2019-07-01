@@ -41,7 +41,7 @@ df_lp_kanto <-
                   attribute_change_floor_area_ratio = "l",
                   frontage_ratio = "d",
                   floor_area_ratio = "d",
-                  attribute_change_selected_land_status = "c",
+                  attribute_change_selected_land_status = "d",
                   attribute_change_address = "l",
                   attribute_change_acreage = "l",
                   attribute_change_current_use = "l",

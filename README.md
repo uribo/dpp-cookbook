@@ -32,6 +32,8 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
       - text
       - date and time
       - coordinates
+  - モデル・アルゴリズムあれこれ
+  - 評価指標あれこれ
 
 ## Dataset
 
