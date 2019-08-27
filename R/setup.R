@@ -61,7 +61,7 @@ df_lp_kanto <-
 
 df_hazard_kys <- 
   readr::read_csv(here::here("data-raw/hazard_kyusyu201607.csv"),
-                  col_types = c("Dclccccdcddlllllddddddddddd")) %>% 
+                  col_types = c("Dclcdccdcddlllllddddddddddd")) %>% 
   assertr::verify(dim(.) == c(2214, 27))
 
 df_beer2018q2 <- 
