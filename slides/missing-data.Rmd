@@ -1,0 +1,146 @@
+---
+title: "欠損値への対応"
+subtitle: "Part of `r emo::ji('book')`Data Preprocessing Cookbook `r set.seed(1); emo::ji('cook')`"
+author: "Uryu Shinya"
+institute: "<span style = 'font-size: 70%;'>`r icon::fa('github')` uribo `r icon::fa('twitter')` u_ribo</span>"
+date: "2019-07-03 (updated: `r Sys.Date()`)"
+output:
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts, ninjutsu, ja-JP.css]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      ratio: "16:9"
+---
+
+```{r setup, include = FALSE}
+source(here::here("R/setup.R"))
+
+df_hazard_kys <- 
+  df_hazard_kys %>% 
+  select(hazardDate, meshCode, hazard, precipitation_max_1hour)
+```
+
+---
+# 概要
+
+- 統計、機械学習モデルによっては欠損値を許容しないものが存在する
+- 欠損値を含んだデータ分析には3種類の障害がある
+- 欠損の発生には主に3つの要因が存在するが、「欠測をデータ内で統制すればランダム」を仮定することが多い (MAR)
+
+---
+# 欠損を含んだデータによる障害
+
+- 統計的処理が不可能になる
+- 結果にバイアスが生じる
+- データ資源が無駄になる
+
+---
+# 欠損データのデメリット1: 統計的処理が不可能に
+
+```{r}
+x <- c(1, NA_real_, 3, 5)
+mean(x)
+```
+
+---
+# 欠損データのデメリット2: 結果のバイアス
+
+```{r}
+# 欠損を除去すれば計算はできるが
+mean(x, na.rm = TRUE)
+```
+
+---
+# 欠損データのデメリット3: データ減少
+
+```{r}
+(x2 <- na.omit(x))
+mean(x2)
+```
+
+---
+# 欠損発生の3つのメカニズム
+
+- 欠損は完全にランダム (MCAR)
+- (**MAR**)
+- (NMAR)
+
+---
+# 欠損への対応3ステップ
+
+1. 欠損値の特定、可視化… 欠損状況、どのように欠損しているか（パターンの有無）
+2. 欠損メカニズムの理解… ランダムな欠損かどうか判断する
+3. 欠損メカニズム、欠損状況に応じた削除もしくは置換（補完）
+    - MARを仮定し、最尤法もしくは多重代入法を用いるのがベター
+    - 機械学習的なアプローチもある
+
+---
+# 欠損の視覚化
+
+日本語入力で問題ない
+
+---
+# 欠損の削除
+
+- 欠損を含む行または特定の列で欠損がある場合に削除を行う
+    - データセット全体で欠損がある行を削除するのは、リストワイズ除去と呼ばれる
+
+![](../images/missing_df_set.png)
+
+.pull-left[
+```{r step_naomit, warning=FALSE}
+# すべての列のいずれかで欠損している行を削除
+df_hazard_kys %>% 
+  recipe(hazard ~ .) %>% 
+  step_naomit(all_predictors()) %>%  #<<
+  prep() %>% 
+  juice() %>% 
+  nrow()
+```
+]
+
+.pull-right[
+```{r}
+# 特定の列だけに欠損が含まれる場合に除去
+df_hazard_kys %>% 
+  recipe(hazard ~ .) %>% 
+  step_naomit(precipitation_max_1hour) %>%  #<<
+  prep() %>% 
+  juice() %>% 
+  nrow()
+```
+]
+
+---
+# 欠損の削除
+
+---
+# 代表値による代入
+
+```{r}
+# step_medianimpute()
+```
+
+
+---
+# knn
+
+欠損する値以外の変数を利用
+
+近傍データを探索、重み付け和で欠損値を補完
+
+```{r step_knnimpute}
+# step_knnimpute()
+```
+
+---
+# Session info
+
+.scroll-output[
+```{r session, eval = TRUE, echo = FALSE}
+sessioninfo::session_info()
+```
+]
