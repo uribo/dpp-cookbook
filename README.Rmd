@@ -31,7 +31,7 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
 - 特徴量選択（フィルタ法）
     - 次元削減
 -  [不均衡データに対する調整](https://uribo.github.io/dpp-cookbook/slides/class-imbalance)
-- 欠損値への対応
+- [欠損値への対応](https://uribo.github.io/dpp-cookbook/slides/missing-data)
     - kNN
 - [データ分割](https://uribo.github.io/dpp-cookbook/slides/data-split)
 - 特徴量エンジニアリング
@@ -44,6 +44,7 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
     - 線形回帰
     - ランダムフォレスト
 - 評価指標あれこれ
+- パラメータ探索
 
 ## Dataset
 
