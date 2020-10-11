@@ -50,23 +50,23 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
 
 ### 地価公示データ (land price)
 
-国土交通省 国土数値情報 （地価公示データ 第2.4版 L01 平成30年度 http://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-L01-v2_5.html ）を使用し瓜生真也が作成・加工したものです。
+国土交通省 国土数値情報 （地価公示データ 第2.4版 L01 平成30年度 https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-L01-v2_5.html ）を使用し瓜生真也が作成・加工したものです。
 
 うち関東一都六県のデータに対しては、該当する市区町村の夜間人口データを 平成27年度 国勢調査 従業地・通学地による人口・就業状態等集計 より付与しました。
 
 ### 土砂災害・雪崩メッシュデータ (hazard)
 
-国土交通省 国土数値情報（土砂災害・雪崩メッシュデータ 第1.1版 A30a5 平成23年度 http://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A30a5.html ）を使用し瓜生真也が作成・加工したものです。
+国土交通省 国土数値情報（土砂災害・雪崩メッシュデータ 第1.1版 A30a5 平成23年度 https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A30a5.html ）を使用し瓜生真也が作成・加工したものです。
 
 このうち九州地方のデータにおいては
 
 各メッシュと対応する標高・傾斜度の情報を
 
-同国土数値情報　標高・傾斜度3次メッシュデータ 第2.2版 G04a 平成21(2009)年度 http://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-G04-a.html 
+同国土数値情報　標高・傾斜度3次メッシュデータ 第2.2版 G04a 平成21(2009)年度 https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-G04-a.html 
 
 より、またメッシュ内に含まれる特殊土壌の情報を
 
-特殊土壌地帯データ 第3.0版 平成28年 http://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A23-v3_0.html
+特殊土壌地帯データ 第3.0版 平成28年 https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A23-v3_0.html
 
 より付属させています。
 
@@ -94,6 +94,6 @@ R言語でのモデリングおよび統計解析のためのパッケージを�
 
 各スライドの末尾にRのバージョンおよびパッケージを掲載しています。
 
-- R 3.6.0
-- local (macOS Mojave)
+- R `r paste(version$major, version$minor, sep = ".")`
+- local (macOS Catalina)
 - docker... Dockerfile is [here](https://github.com/uribo/dpp-cookbook/blob/master/Dockerfile)
